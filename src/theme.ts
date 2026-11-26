@@ -1,0 +1,17 @@
+export const colors = {
+  paper: '#f7f2ea',
+  card: '#fffcf8',
+  white: '#ffffff',
+  ink: '#1c1814',
+  muted: '#746b62',
+  line: '#e6d9c8',
+  inputBorder: '#e3d5c4',
+  felt: '#176b3f',
+  feltPressed: '#125833',
+  danger: '#b42318',
+  dangerPressed: '#9a1d14',
+  loss: '#157a45',
+  rank: '#efe4d6',
+  rankInk: '#5e564e',
+  win: '#b42318',
+} as const

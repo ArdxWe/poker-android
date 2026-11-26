@@ -1,0 +1,5 @@
+export const SESSION_KEY = 'felt.session.v1'
+export const TOKEN_KEY = 'felt.server.token.v1'
+export const CLUB_KEY = 'felt.server.club.v1'
+export const ISSUED_KEY = 'felt.server.issued.v1'
+export const API_BASE_KEY = 'felt.api.base.v1'
