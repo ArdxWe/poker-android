@@ -1,86 +1,95 @@
 # Poker club
 
-朋友之间记一局德州的牌桌。这是网页版 [ardxwe-table](https://ardxwe-table.netlify.app/) 的安卓客户端：买入、剩下的筹码、历史和排名都走同一套算法，俱乐部仍然只请求已经在线上的 `POST /api/club`。
+An Android client for the web app at [ardxwe-table](https://ardxwe-table.netlify.app/). Friends use it to keep a Texas hold'em table: buy-ins, chips left, history, and standings all use the same ledger as the site. The club still talks only to the existing `POST /api/club` endpoint.
 
-界面文案是英文，和网页一致。赢是红的，输是绿的。发给朋友的是签名 APK，不上应用商店。
+The UI copy is English, matching the site. Wins are red and losses are green. Friends install a signed APK. This app is not published to an app store.
 
-方案在 [docs/android-plan.md](docs/android-plan.md)。网页仓库是 [ArdxWe/poker](https://github.com/ArdxWe/poker)，这个应用不放进那个仓库，也不改它的接口。
+Design notes are in [docs/android-plan.md](docs/android-plan.md). The web app lives in [ArdxWe/poker](https://github.com/ArdxWe/poker). This client stays in its own repository and does not change that API.
 
-## 环境
+## Features
 
-- Node.js 22 或更新
-- 手机上的 [Expo Go](https://expo.dev/go)（Android），或一台 Android 模拟器
-- 不需要 Expo 账号也能在 Expo Go 里开发和试用
+- Join a club or create one. A new club gets an 8-character password.
+- Score the current table on the device. An in-progress table is not uploaded.
+- Save and delete finished games through `POST /api/club`.
+- Show game history and standings from the last club the device successfully loaded.
+- Open a read-only share of one game or a whole club. Share links always point at the live site, so someone without the app can open them in a browser.
+- Point the client at another origin with `EXPO_PUBLIC_API_BASE_URL` or the Server field on the join screen.
+
+## Setup
+
+- Node.js 22 or newer
+- [Expo Go](https://expo.dev/go) on an Android phone, or an Android emulator
+- An Expo account is not required to develop and try the app in Expo Go
 
 ```bash
 npm install
 ```
 
-## 用 Expo Go 跑
+## Run with Expo Go
 
 ```bash
 npm start
 ```
 
-终端里会出现二维码。手机和电脑在同一网络时，用 Expo Go 扫码。Expo Go 能完成加入、新建、口令、记牌、只读分享（Open link）。系统分享面板把一段文字直接交给本应用，要等装上自己打出来的 APK，Expo Go 里没有这份原生模块。
+The terminal prints a QR code. With the phone and computer on the same network, scan it in Expo Go. Expo Go can join, create, confirm a password, score a table, and open a read-only share with Open link. Handing a block of text to this app from the system share sheet needs a signed APK. Expo Go does not include that native module.
 
-## 用安卓模拟器跑
+## Run on an Android emulator
 
-先打开 Android Studio 里的模拟器，然后：
+Start an emulator in Android Studio, then:
 
 ```bash
 npm run android
 ```
 
-模拟器访问电脑上的网页开发服务器时，地址是 `http://10.0.2.2:5173`，不是 `localhost`。真机用电脑的局域网 IP。
+From the emulator, the web dev server on the computer is `http://10.0.2.2:5173`, not `localhost`. A physical device uses the computer's LAN address.
 
-发给朋友的 APK 只包含 `arm64-v8a`。x86 模拟器跑的是 Expo Go，不是这份 APK。要在模拟器里安装 APK，需要 arm64 的系统映像。
+The APK built for friends contains only `arm64-v8a`. An x86 emulator runs Expo Go, not that APK. Installing the APK in an emulator needs an arm64 system image.
 
-## 俱乐部接口
+## Club API
 
-默认请求：
+The default request is:
 
 ```text
 POST https://ardxwe-table.netlify.app/api/club
 Content-Type: application/json
 ```
 
-请求体是 `{ "op": "..." }`。成功时 `{ "ok": true, "token": "...", "club": { ... } }`，`club.games` 已按时间从新到旧排好。失败时 `{ "ok": false, "reason": "..." }`。
+The body is `{ "op": "..." }`. Success is `{ "ok": true, "token": "...", "club": { ... } }`. The live endpoint returns `club.games` newest first, and this app lists them in that order. Failure is `{ "ok": false, "reason": "..." }`.
 
-| op | 何时 | 主要字段 |
+| op | When | Main fields |
 | --- | --- | --- |
-| `create` | 新建 | `name`，`readPassword`，`writePassword`（和读口令相同），`games: []` |
-| `open` | 加入 | `readPassword` |
-| `restore` | 冷启动 | `token` |
-| `refresh` | 回到前台 | `token` |
-| `save` | 保存一局 | `token`，`game` |
-| `delete` | 删除一局 | `token`，`gameId` |
+| `create` | New club | `name`, `readPassword`, `writePassword` (same as the read password), `games: []` |
+| `open` | Join | `readPassword` |
+| `restore` | Cold start | `token` |
+| `refresh` | Return to the foreground | `token` |
+| `save` | Save one game | `token`, `writePassword: ""`, `game` |
+| `delete` | Delete one game | `token`, `writePassword: ""`, `gameId` |
 
-口令 8 位，字符集 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`。服务器只存 SHA-256。进行中的一桌不上传。没网时可以记牌，保存需要服务器；上次成功拿到的俱乐部会留在本机。
+Passwords are 8 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`. The server stores only the SHA-256. Scoring works offline. Saving needs the server. The last club that loaded successfully stays on the device.
 
-分享链接永远指向线上网站，方便没装应用的人用浏览器打开：
+Share links always use the live site:
 
-- 一局：`https://ardxwe-table.netlify.app/#g=` + base64url
-- 一整家：`https://ardxwe-table.netlify.app/#c=` + 同样的编码
+- One game: `https://ardxwe-table.netlify.app/#g=` plus base64url
+- A whole club: `https://ardxwe-table.netlify.app/#c=` plus the same encoding
 
-本机键名和网页对齐：`felt.session.v1`、`felt.server.token.v1`、`felt.server.club.v1`、`felt.server.issued.v1`。开发时改过的接口地址存在 `felt.api.base.v1`。
+Local keys match the web app: `felt.session.v1`, `felt.server.token.v1`, `felt.server.club.v1`, `felt.server.issued.v1`. A server address changed during development is stored in `felt.api.base.v1`.
 
-## 改接口地址
+## API base URL
 
-不改代码也能换地址。
+The origin can be changed without editing code.
 
-1. 复制 `.env.example` 为 `.env`，设置 `EXPO_PUBLIC_API_BASE_URL`。模拟器例子：`http://10.0.2.2:5173`。改完重启 `npm start`。
-2. 已经装上的应用：加入页底部的 Server，填源站地址（不要自己加 `/api/club`），点 Save server。Use default 回到线上。
+1. Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_BASE_URL`. For the emulator, `http://10.0.2.2:5173`. Restart `npm start` after changing it.
+2. On an installed app, open Server at the bottom of the join screen, enter the site origin (do not append `/api/club`; a trailing `/api/club` is stripped), and tap Save server. Use default returns to the built-in origin.
 
-明文 HTTP 只在 `EXPO_PUBLIC_ALLOW_CLEARTEXT` 不为 `0` 时打开。本地调试默认允许。`eas.json` 里的 `production` 会把它设成 `0`。
+Plain HTTP is enabled only when `EXPO_PUBLIC_ALLOW_CLEARTEXT` is not `0`. Local development allows it. The `production` profile in `eas.json` sets it to `0`.
 
-## 打签名 APK
+## Build a signed APK
 
-密钥不要放进仓库。下面两条路都打出可以直接安装的 APK，不是给 Play 用的 AAB。每发一版，把 `app.config.ts` 里的 `version` 和 `android.versionCode` 加一。
+Keep the signing key out of the repository. Both paths below produce an APK you can install directly, not an AAB for Play. For each release, increment `version` and `android.versionCode` in `app.config.ts`.
 
 ### EAS Build
 
-需要 Expo 账号。第一次会在 Expo 服务器上生成签名密钥，密钥不在这个仓库里。
+This needs an Expo account. The first build creates the signing key on Expo's servers. That key is not in this repository.
 
 ```bash
 npm install -g eas-cli
@@ -88,40 +97,40 @@ eas login
 eas build -p android --profile production
 ```
 
-`production` 打 release APK，并且不允许明文 HTTP。想在这只包里连 `http://` 开发服务器，用 `preview`：
+`production` builds a release APK and disallows plain HTTP. To let that package reach an `http://` dev server, use `preview`:
 
 ```bash
 eas build -p android --profile preview
 ```
 
-构建完成后从 Expo 页面下载 APK。
+Download the APK from the Expo build page when it finishes.
 
-### 本机 Gradle
+### Local Gradle
 
-需要 JDK、Android SDK，以及国内网络下通常要给 Gradle 配镜像。
+This needs a JDK and the Android SDK. If Gradle cannot reach its default hosts, configure a mirror.
 
-在仓库外生成密钥（路径自己保管）：
+Generate the key outside the repository and keep the path private:
 
 ```bash
 keytool -genkeypair -v -storetype PKCS12 -keystore "$HOME/keys/poker-club.keystore" -alias poker-club -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-生成原生工程（`android/` 已被 git 忽略，可以随时删掉重来）：
+Generate the native project. `android/` is gitignored and can be deleted and recreated:
 
 ```bash
 npx expo prebuild --platform android
 ```
 
-在 `android/gradle.properties` 里写下密钥位置（这个文件在被忽略的 `android/` 里）：
+Write the key location in `android/gradle.properties` (that file lives in the ignored `android/` directory):
 
 ```properties
 POKER_UPLOAD_STORE_FILE=/absolute/path/poker-club.keystore
-POKER_UPLOAD_STORE_PASSWORD=你的口令
+POKER_UPLOAD_STORE_PASSWORD=your-store-password
 POKER_UPLOAD_KEY_ALIAS=poker-club
-POKER_UPLOAD_KEY_PASSWORD=你的口令
+POKER_UPLOAD_KEY_PASSWORD=your-key-password
 ```
 
-把 `signingConfigs` 放进 `android/app/build.gradle` 已有的 `android` 块。在 Expo 生成的 `buildTypes.release` 里加上 `signingConfig signingConfigs.release`，保留原来的其他配置：
+Add `signingConfigs` inside the existing `android` block in `android/app/build.gradle`. On the `buildTypes.release` block Expo generated, set `signingConfig signingConfigs.release` and keep the rest of that block:
 
 ```gradle
 signingConfigs {
@@ -134,34 +143,34 @@ signingConfigs {
 }
 ```
 
-然后：
+Then:
 
 ```bash
 cd android
 ./gradlew assembleRelease
 ```
 
-APK 在 `android/app/build/outputs/apk/release/app-release.apk`。
+The APK is `android/app/build/outputs/apk/release/app-release.apk`.
 
-## 装到手机上
+## Install on a phone
 
-Android 8 起按来源允许安装未知应用。应用不申请存储权限。微信经常拦截或改写 `.apk`，打成 zip 再发更稳。面对面传文件也可以。不要把 APK 上传到 Netlify 当作安装方式。
+From Android 8 onward, allow installs from the source you use. The app does not request storage permission. WeChat often blocks or rewrites an `.apk`, so sending it inside a zip is more reliable. Transferring the file in person also works. Do not upload the APK to Netlify as the way to install it.
 
-## 检查
+## Checks
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-`npm test` 跑的是从网页复制过来的记分、分享链接测试，以及口令和俱乐部请求的测试。
+`npm test` runs the scoring and share-link tests copied from the web app, plus the password and club-request tests.
 
-## 和方案不一样的地方
+## Known gaps
 
-记分、分享编码和 `POST /api/club` 的形状跟网页一致。下面几条是对照网页源码之后的取舍，细节写在方案末尾：
+Scoring, share encoding, and the shape of `POST /api/club` match the web app. These are the choices made after reading that source. The notes at the end of the plan have the longer version.
 
-- 断网时保存或删除，网页会抛出未接住的错误。这里停在原来的页面，并显示网页上那句英文。
-- 从后台回来的刷新如果返回时已经换成另一家俱乐部，这次结果丢掉。
-- 刷新失败只打开离线提示，不把人踢回加入页。冷启动时 token 无效仍会清掉会话并回到加入页。
-- 离开只读分享时，如果新建口令还没点 Enter club，先回到口令页。
-- Expo Go 里用 Open link 打开 `#g=` / `#c=`。系统分享入口在签名 APK 里。
+- If save or delete fails because the device is offline, the web app throws an error it does not catch. This app stays on the current screen and shows the same English line: `Could not save. This game is still here.` or `Could not remove that game.`
+- A refresh started when returning to the foreground is dropped if the open club has changed by the time the response arrives.
+- A failed refresh only turns on the offline note. It does not send the user back to the join screen. On a cold start, an invalid token still clears the session and returns to the join screen, unless a new-club password is still waiting on the passphrase screen.
+- Leaving a read-only share returns to the passphrase screen when Enter club has not been tapped yet for a new password.
+- In Expo Go, open `#g=` and `#c=` links with Open link. The system share entry is in the signed APK.
